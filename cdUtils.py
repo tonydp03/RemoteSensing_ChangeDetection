@@ -13,7 +13,7 @@ import os
 import numpy as np
 from osgeo import osr
 from osgeo import gdal
-
+import random
 
 def build_raster(folder):
     filenames = ['B01','B02','B03','B04','B05','B06','B07','B08','B8A','B09','B10','B11','B12']
@@ -98,3 +98,56 @@ def createGeoCM(cmName, geoTiff, cmArray):
     outRasterSRS = osr.SpatialReference(wkt=prj)
     outRaster.SetProjection(outRasterSRS.ExportToWkt())
     outband.FlushCache()
+
+def trim(img, x, y, crop_size):
+    return(img[x:x+crop_size, y:y+crop_size, :])
+
+def random_transform(img, val):
+  return {
+    0: lambda img: img,
+    1: lambda img: np.rot90(img,1),
+    2: lambda img: np.rot90(img,2),
+    3: lambda img: np.rot90(img,3),
+    4: lambda img: np.flipud(img),
+    5: lambda img: np.fliplr(img),
+    6: lambda img: np.fliplr(np.flipud(img))
+    }[val](img)
+
+def createDataset_fromOnera(aug, cpt, crop_size, stride, folders, dataset_dir, labels_dir):
+    train_images = []
+    train_labels = []
+    
+    if(aug==True): # select random crops and apply transformation
+        for f in folders:
+            raster1 = build_raster(dataset_dir + f + '/imgs_1_rect/')
+            raster2 = build_raster(dataset_dir + f + '/imgs_2_rect/')
+            raster = np.concatenate((raster1,raster2), axis=2)
+            cm = gdal.Open(labels_dir + f + '/cm/' + f + '-cm.tif').ReadAsArray()
+            cm = np.expand_dims(cm, axis=2)
+            cm -= 1 # the change map has values 1 for no change and 2 for change ---> scale back to 0 and 1
+            for i in range(cpt):
+                x = random.randint(0,raster.shape[0]-crop_size)
+                y = random.randint(0,raster.shape[1]-crop_size)                
+                img = trim(raster, x, y, crop_size)
+                label = trim(cm, x, y, crop_size)
+                n = random.randint(0,6)          
+                train_images.append(random_transform(img, n))
+                train_labels.append(random_transform(label, n))
+    else:
+        for f in folders:
+            raster1 = build_raster(dataset_dir + f + '/imgs_1_rect/')
+            raster2 = build_raster(dataset_dir + f + '/imgs_2_rect/')
+            raster = np.concatenate((raster1,raster2), axis=2)
+            cm = gdal.Open(labels_dir + f + '/cm/' + f + '-cm.tif').ReadAsArray()
+            cm = np.expand_dims(cm, axis=2)
+            cm -= 1 # the change map has values 1 for no change and 2 for change ---> scale back to 0 and 1
+            padded_raster = pad(raster, crop_size)
+            train_images = train_images + crop(padded_raster, crop_size, stride)    
+            padded_cm = pad(cm, crop_size)
+            train_labels = train_labels + crop(padded_cm, crop_size, stride)
+
+    # Create inputs and labels for the Neural Network
+    inputs = np.asarray(train_images, dtype='float32')
+    labels = np.asarray(train_labels, dtype='float32')
+    
+    return inputs, labels

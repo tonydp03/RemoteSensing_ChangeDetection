@@ -31,7 +31,7 @@ model_dir = 'models/'
 infres_dir = 'results/'
 # loss = args.loss
 # loss = 'binary_crossentropy'
-model_name = 'EF-UNet_'+str(img_size)+'-'+str(stride)
+model_name = 'EF_'+str(img_size)+'-'+str(stride)
 
 # Get the list of folders to open to get rasters
 # folders = rnc.get_folderList(dataset_dir + 'test.txt')
