@@ -25,14 +25,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--stride', type=int, default=64) # Stride used for patches when data augmentation is not applied
 parser.add_argument('--epochs', '-e', type=int, default=50)
-parser.add_argument('--augmentation', '-a', type=bool, default=False) # Implement data augmentation or not
+parser.add_argument('--batch', '-b', type=int, default=32)
+parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
 parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
 #parser.add_argument('--loss', '-l', type=str, default='bce')
 #parser.add_argument('--model', type=str, default='ef')
 
 args = parser.parse_args()
 
-batch_size = 32
+batch_size = args.batch
 img_size = args.size
 channels = 13
 stride = args.stride

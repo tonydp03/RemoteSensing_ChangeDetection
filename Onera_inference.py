@@ -19,19 +19,26 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--stride', type=int, default=64)
+parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
+parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
 # parser.add_argument('--loss', '-l', type=str, default='bce')
 
 args = parser.parse_args()
 
 img_size = args.size
 stride = args.stride
+aug = args.augmentation
+cpt = args.cpt
 classes = 1
 dataset_dir = '../CD_wOneraDataset/OneraDataset_Images/'
 model_dir = 'models/'
 infres_dir = 'results/'
 # loss = args.loss
 # loss = 'binary_crossentropy'
-model_name = 'EF-UNet_'+str(img_size)+'-'+str(stride)
+if(aug==True):
+    model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+else:
+    model_name = 'EF_'+str(img_size)+'-'+str(stride)
 
 # Get the list of folders to open to get rasters
 # folders = rnc.get_folderList(dataset_dir + 'test.txt')

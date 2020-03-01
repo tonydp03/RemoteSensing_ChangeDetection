@@ -24,11 +24,17 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--stride', type=int, default=64)
+parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
+parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
+parser.add_argument('--batch', '-b', type=int, default=32)
 args = parser.parse_args()
 
+batch_size = args.batch
 img_size = args.size
 channels = 13
 stride = args.stride
+aug = args.augmentation
+cpt = args.cpt
 classes = 1
 dataset_dir = '../CD_wOneraDataset/OneraDataset_Images/'
 labels_dir = '../CD_wOneraDataset/OneraDataset_TrainLabels/'
@@ -36,7 +42,10 @@ model_dir = 'models/'
 hist_dir = 'histories/'
 plot_dir = 'plots/'
 score_dir = 'scores/'
-model_name = 'EF_'+str(img_size)+'-'+str(stride)+'_relu'
+if(aug==True):
+    model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+else:
+    model_name = 'EF_'+str(img_size)+'-'+str(stride)
 history_name = model_name + '_history'
 class_names = ['unchange', 'change']
 

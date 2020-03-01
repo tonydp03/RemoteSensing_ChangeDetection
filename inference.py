@@ -19,32 +19,27 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--stride', type=int, default=64)
+parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
+parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
 # parser.add_argument('--loss', '-l', type=str, default='bce')
 
 args = parser.parse_args()
 
 img_size = args.size
 stride = args.stride
+aug = args.augmentation
+cpt = args.cpt
 classes = 1
 dataset_dir = '../CD_Sentinel2/tiff/Rome/'
 model_dir = 'models/'
 infres_dir = 'results/'
 # loss = args.loss
 # loss = 'binary_crossentropy'
-model_name = 'EF_'+str(img_size)+'-'+str(stride)
+if(aug==True):
+    model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+else:
+    model_name = 'EF_'+str(img_size)+'-'+str(stride)
 
-# Get the list of folders to open to get rasters
-# folders = rnc.get_folderList(dataset_dir + 'test.txt')
-f = open(dataset_dir + 'train.txt', 'r')
-folders = f.read().split(',')
-f.close()
-
-# Select a folder, build raster, pad it and crop it to get the input images
-# f = random.choice(folders)
-f = 'rennes'
-
-# raster1 = cdUtils.build_raster(dataset_dir + f + '/imgs_1_rect/')
-# raster2 = cdUtils.build_raster(dataset_dir + f + '/imgs_2_rect/')
 tiffData = gdal.Open(dataset_dir + 'pre_ro_2018_12_27.tif')
 raster1 = tiffData.ReadAsArray()
 raster1 = np.moveaxis(raster1, 0, 2) # gdal reads as array with channel-first data format
@@ -55,7 +50,7 @@ padded_raster = cdUtils.pad(raster, img_size)
 test_image = cdUtils.crop(padded_raster, img_size, img_size)
 
 # Create inputs for the Neural Network
-inputs = np.asarray(test_image, dtype='float16')
+inputs = np.asarray(test_image, dtype='float32')
 
 # Load model
 model = K.models.load_model(model_dir + model_name + '.h5')
@@ -79,6 +74,6 @@ if not os.path.exists(infres_dir):
     os.mkdir(infres_dir)
 
 # Now create the georeferenced change map
-cdUtils.createGeoCM('romeTest.tif', tiffData, cm)
+cdUtils.createGeoCM(infres_dir + 'Rome-' + model_name +'.tif', tiffData, cm)
 
 print('Georeferenced change map created at %s' %infres_dir)
