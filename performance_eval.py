@@ -27,11 +27,12 @@ parser.add_argument('--stride', type=int, default=64)
 parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
 parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
 parser.add_argument('--batch', '-b', type=int, default=32)
+parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
 args = parser.parse_args()
 
 batch_size = args.batch
 img_size = args.size
-channels = 13
+channels = args.channels
 stride = args.stride
 aug = args.augmentation
 cpt = args.cpt
@@ -43,9 +44,12 @@ hist_dir = 'histories/'
 plot_dir = 'plots/'
 score_dir = 'scores/'
 if(aug==True):
-    model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+    test_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+    model_name = test_name+'_'+str(channels)+'channels'
+
 else:
-    model_name = 'EF_'+str(img_size)+'-'+str(stride)
+    model_name = 'EF_'+str(img_size)+'-'+str(stride)+'_'+str(channels)+'channels'
+plot_dir = plot_dir+test_name+'/'
 history_name = model_name + '_history'
 class_names = ['unchange', 'change']
 
@@ -86,8 +90,8 @@ unpadded_shapes = []
 
 for f in folders:
     
-    raster1 = cdUtils.build_raster(dataset_dir + f + '/imgs_1_rect/')
-    raster2 = cdUtils.build_raster(dataset_dir + f + '/imgs_2_rect/')
+    raster1 = cdUtils.build_raster(dataset_dir + f + '/imgs_1_rect/', channels)
+    raster2 = cdUtils.build_raster(dataset_dir + f + '/imgs_2_rect/', channels)
     raster = np.concatenate((raster1,raster2), axis=2)
     padded_raster = cdUtils.pad(raster, img_size)
     shape = (padded_raster.shape[0], padded_raster.shape[1], classes)
@@ -101,12 +105,12 @@ for f in folders:
     cm = np.expand_dims(cm, axis=2)
     cm -= 1 # the change map has values 1 for unchange and 2 for change ---> scale back to 0 and 1
     unpadded_shapes.append(cm.shape)
-    cm = cm.astype('float64')
+    cm = cm.astype('float32')
     cm = cm.flatten()
     train_labels.append(cm)
 
 # Create inputs for the Neural Network
-inputs = np.asarray(train_images, dtype='float16')
+inputs = np.asarray(train_images, dtype='float32')
 
 # Load the model
 model = tf.keras.models.load_model(model_dir + model_name + '.h5')

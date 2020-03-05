@@ -28,6 +28,7 @@ parser.add_argument('--epochs', '-e', type=int, default=50)
 parser.add_argument('--batch', '-b', type=int, default=32)
 parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
 parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
+parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
 #parser.add_argument('--loss', '-l', type=str, default='bce')
 #parser.add_argument('--model', type=str, default='ef')
 
@@ -35,7 +36,7 @@ args = parser.parse_args()
 
 batch_size = args.batch
 img_size = args.size
-channels = 13
+channels = args.channels
 stride = args.stride
 classes = 1
 epochs = args.epochs
@@ -47,7 +48,7 @@ model_dir = 'models/'
 hist_dir = 'histories/'
 # loss = args.loss
 if(aug==True):
-    model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+    model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)+'_'+str(channels)+'channels'
 else:
     model_name = 'EF_'+str(img_size)+'-'+str(stride)
 history_name = model_name + '_history'
@@ -58,7 +59,7 @@ folders = f.read().split(',')
 f.close()
 
 # Create Dataset from Onera
-inputs, labels = cdUtils.createDataset_fromOnera(aug, cpt, img_size, stride, folders, dataset_dir, labels_dir)
+inputs, labels = cdUtils.createDataset_fromOnera(aug, cpt, img_size, stride, channels, folders, dataset_dir, labels_dir)
 
 # Compute class weights
 flat_labels = np.reshape(labels,[-1])

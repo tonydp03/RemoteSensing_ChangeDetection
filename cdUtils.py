@@ -15,16 +15,14 @@ from osgeo import osr
 from osgeo import gdal
 import random
 
-def build_raster(folder):
-    filenames = ['B01','B02','B03','B04','B05','B06','B07','B08','B8A','B09','B10','B11','B12']
-    bands = [gdal.Open(folder + f + '.tif').ReadAsArray() for f in filenames]
+def build_raster(folder, channels):
+    filenames = {3:['B02','B03','B04'], # RGB
+        4: ['B02','B03','B04', 'B08'], # 10m resolution
+        7: ['B01','B02','B03','B04', 'B08', 'B09', 'B10'], #10m + 60m resolution
+        10: ['B02','B03','B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11','B12'], #10m + 20m resolution
+        13: ['B01','B02','B03','B04','B05','B06','B07','B08','B8A','B09','B10','B11','B12']} # full raster
+    bands = [gdal.Open(folder + f + '.tif').ReadAsArray() for f in filenames[channels]]
     raster = np.stack(bands, axis=2)
-    return raster
-
-def build_rasterRGB(folder):
-    filenames = ['B02','B03','B04']
-    bands = [gdal.Open(folder + f + '.tif').ReadAsArray() for f in filenames]
-    raster = np.stack(bands, axis=2)    
     return raster
 
 def pad(img, crop_size):
@@ -113,14 +111,14 @@ def random_transform(img, val):
     6: lambda img: np.fliplr(np.flipud(img))
     }[val](img)
 
-def createDataset_fromOnera(aug, cpt, crop_size, stride, folders, dataset_dir, labels_dir):
+def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, dataset_dir, labels_dir):
     train_images = []
     train_labels = []
     
     if(aug==True): # select random crops and apply transformation
         for f in folders:
-            raster1 = build_raster(dataset_dir + f + '/imgs_1_rect/')
-            raster2 = build_raster(dataset_dir + f + '/imgs_2_rect/')
+            raster1 = build_raster(dataset_dir + f + '/imgs_1_rect/', channels)
+            raster2 = build_raster(dataset_dir + f + '/imgs_2_rect/', channels)
             raster = np.concatenate((raster1,raster2), axis=2)
             cm = gdal.Open(labels_dir + f + '/cm/' + f + '-cm.tif').ReadAsArray()
             cm = np.expand_dims(cm, axis=2)
