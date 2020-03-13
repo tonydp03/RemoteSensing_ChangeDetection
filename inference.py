@@ -34,7 +34,6 @@ dataset_dir = '../CD_Sentinel2/tiff/Rome/'
 model_dir = 'models/'
 infres_dir = 'results/'
 # loss = args.loss
-# loss = 'binary_crossentropy'
 if(aug==True):
     model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
 else:

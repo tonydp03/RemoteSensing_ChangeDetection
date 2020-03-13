@@ -74,14 +74,12 @@ model.summary()
 history = model.fit(inputs, labels, batch_size=batch_size, epochs=epochs, class_weight=weights, validation_split=0.1, callbacks=[K.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=1, restore_best_weights=True)], shuffle=True, verbose=1)
 
 # Save the history for accuracy/loss plotting
-
 if not os.path.exists(hist_dir):
     os.mkdir(hist_dir)
 
 history_save = pd.DataFrame(history.history).to_hdf(hist_dir + history_name + ".h5", "history", append=False)
 
 # Save model and weights
-
 if not os.path.exists(model_dir):
     os.mkdir(model_dir)
 

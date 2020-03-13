@@ -9,14 +9,14 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-
 parser.add_argument('--size', type=int, default=128)
-
 args = parser.parse_args()
 
 img_size = args.size
 score_dir = 'scores/'
-plot_dir = 'plots/'
+plot_dir = 'plots/test/'
+if not os.path.exists(plot_dir):
+    os.mkdir(plot_dir)
 
 # ROC comparison
 files = [f for f in os.listdir(score_dir) if (str(img_size) in f and f.endswith("h5"))]
@@ -37,6 +37,8 @@ for(i, name) in zip(range(len(files)), tqdm(files)):
     models.append(model_id)
 
 plot_dir = plot_dir + model_name + '/'
+if not os.path.exists(plot_dir):
+    os.mkdir(plot_dir)
 
 # plot ROC curves
 plt.figure()

@@ -38,21 +38,12 @@ model_dir = 'models/'
 infres_dir = 'results/'
 f = args.city
 # loss = args.loss
-# loss = 'binary_crossentropy'
 if(aug==True):
     model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
 else:
     model_name = 'EF_'+str(img_size)+'-'+str(stride)
 
-# Get the list of folders to open to get rasters
-# folders = rnc.get_folderList(dataset_dir + 'test.txt')
-# f = open(dataset_dir + 'train.txt', 'r')
-# folders = f.read().split(',')
-# f.close()
-
-# Select a folder, build raster, pad it and crop it to get the input images
-# f = random.choice(folders)
-
+# Build raster, pad it and crop it to get the input images
 raster1 = cdUtils.build_raster(dataset_dir + f + '/imgs_1_rect/', channels)
 raster2 = cdUtils.build_raster(dataset_dir + f + '/imgs_2_rect/', channels)
 raster = np.concatenate((raster1,raster2), axis=2)
@@ -89,8 +80,6 @@ if not os.path.exists(res_dir):
     os.mkdir(res_dir)
 
 # Now create the georeferenced change map
-######## This should be fixed (check ERROR 4: no such file or directory)
-
 for img in os.listdir(dataset_dir + f + '/imgs_1/'):
     if(img.endswith('B04.tif') and img.startswith('S')):
         geoTiff = gdal.Open(dataset_dir + f + '/imgs_1/' + img)
