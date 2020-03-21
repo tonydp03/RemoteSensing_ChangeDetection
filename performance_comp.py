@@ -10,13 +10,25 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
+parser.add_argument('--model', type=str, default='EF', help='EF, new_EF or Siam or SiamDiff')
+parser.add_argument('--augmentation', '-a', type=bool, default=True)
+parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
 args = parser.parse_args()
 
 img_size = args.size
-score_dir = 'scores/'
-plot_dir = 'plots/test/'
-if not os.path.exists(plot_dir):
-    os.mkdir(plot_dir)
+mod = args.model
+aug = args.augmentation
+cpt = args.cpt
+score_dir = 'scores/' + mod + '/'
+plot_dir = 'plots/' + mod + '/'
+
+if(aug==True):
+    mod_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)
+else:
+    mod_name = mod+'_'+str(img_size)+'-'+str(stride)
+
+plot_dir = plot_dir+mod_name+'/'
+score_dir = score_dir+mod_name+'/'
 
 # ROC comparison
 files = [f for f in os.listdir(score_dir) if (str(img_size) in f and f.endswith("h5"))]
@@ -36,9 +48,8 @@ for(i, name) in zip(range(len(files)), tqdm(files)):
     model_name = model[0]
     models.append(model_id)
 
-plot_dir = plot_dir + model_name + '/'
-if not os.path.exists(plot_dir):
-    os.mkdir(plot_dir)
+
+os.makedirs(plot_dir, exist_ok=True)
 
 # plot ROC curves
 plt.figure()
@@ -77,25 +88,26 @@ ax = plt.axes(projection='3d')
 color = ['C'+str(i) for i in range(len(scores))]
 
 for i in range(len(scores)):
-    ax.scatter3D(scores[i][0], scores[i][1], scores[i][2], c=color[i], s=70, label=labels[i])
+    ax.scatter3D(scores[i][0], scores[i][1], scores[i][3], c=color[i], s=70, label=labels[i])
 
 ax.set_xlabel('Precision')
 ax.set_ylabel('Recall')
 ax.set_zlabel('Balanced Accuracy')
-plt.tight_layout()
-plt.title(model_name, fontsize=11, pad=0)
+plt.title(model_name, pad=15)
 ax.legend(loc='upper left')
+plt.tight_layout()
 plt.savefig(plot_dir + model_name + '_3Dscore_comparison.pdf', format='pdf')
 
 # plot scores 2D
+#fig, ax = plt.subplots()
 ax = plt.axes()
 for i in range(len(scores)):
     ax.scatter(scores[i][2], scores[i][3], c=color[i], s=70, label=labels[i])
 ax.set_xlabel('F1 score')
 ax.set_ylabel('Balanced Accuracy')
-plt.tight_layout()
-plt.title(model_name, fontsize=11)
+plt.title(model_name, pad=15)
 ax.legend(loc='upper left')
 ax.grid(ls=':')
 ax.set_axisbelow(True)
+plt.tight_layout()
 plt.savefig(plot_dir + model_name + '_2Dscore_comparison.pdf', format='pdf')

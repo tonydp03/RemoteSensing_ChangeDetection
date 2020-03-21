@@ -24,10 +24,11 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--stride', type=int, default=64)
-parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
-parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
+parser.add_argument('--augmentation', '-a', type=bool, default=True) # Use data augmentation or not
+parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
 parser.add_argument('--batch', '-b', type=int, default=32)
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
+parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
 args = parser.parse_args()
 
 batch_size = args.batch
@@ -36,28 +37,29 @@ channels = args.channels
 stride = args.stride
 aug = args.augmentation
 cpt = args.cpt
+mod = args.model
 classes = 1
 dataset_dir = '../CD_wOneraDataset/OneraDataset_Images/'
 labels_dir = '../CD_wOneraDataset/OneraDataset_TrainLabels/'
-model_dir = 'models/'
-hist_dir = 'histories/'
-plot_dir = 'plots/'
-score_dir = 'scores/'
+model_dir = 'models/' + mod + '/'
+hist_dir = 'histories/' + mod + '/'
+plot_dir = 'plots/' + mod + '/'
+score_dir = 'scores/' + mod + '/'
+
 if(aug==True):
-    test_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+    test_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)
+    model_name = test_name+'_'+str(channels)+'channels'
+else:
+    test_name = mod+'_'+str(img_size)+'-'+str(stride)
     model_name = test_name+'_'+str(channels)+'channels'
 
-else:
-    model_name = 'EF_'+str(img_size)+'-'+str(stride)+'_'+str(channels)+'channels'
 plot_dir = plot_dir+test_name+'/'
+score_dir = score_dir+test_name+'/'
 history_name = model_name + '_history'
 class_names = ['unchange', 'change']
 
-if not os.path.exists(plot_dir):
-    os.mkdir(plot_dir)
-
-if not os.path.exists(score_dir):
-    os.mkdir(score_dir)
+os.makedirs(plot_dir, exist_ok=True)
+os.makedirs(score_dir, exist_ok=True)
 
 # Plot the loss function during training and validation steps
 history = pd.read_hdf(hist_dir + history_name + ".h5", "history")
@@ -111,6 +113,11 @@ for f in folders:
 
 # Create inputs for the Neural Network
 inputs = np.asarray(train_images, dtype='float32')
+
+if(mod=='Siam' or mod=='SiamDiff'):
+    inputs_1 = inputs[:,:,:,:channels]
+    inputs_2 = inputs[:,:,:,channels:]
+    inputs = [inputs_1, inputs_2]
 
 # Load the model
 model = tf.keras.models.load_model(model_dir + model_name + '.h5')

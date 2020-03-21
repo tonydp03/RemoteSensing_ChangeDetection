@@ -25,6 +25,17 @@ def build_raster(folder, channels):
     raster = np.stack(bands, axis=2)
     return raster
 
+def build_raster_fromMultispectral(dataset, channels):
+    band_num = {3:[2,3,4], # RGB
+        4: [2,3,4,8], # 10m resolution
+        7: [1,2,3,4,8,10,11], #10m + 60m resolution
+        10: [2,3,4,5,6,7,8,9,12,13], #10m + 20m resolution
+        13: [1,2,3,4,5,6,7,8,9,10,11,12,13]}
+
+    bands = [dataset.GetRasterBand(b).ReadAsArray() for b in band_num[channels]]
+    raster = np.stack(bands, axis = 2)
+    return raster
+    
 def pad(img, crop_size):
     h, w, c = img.shape
     n_h = int(h/crop_size)
@@ -149,3 +160,12 @@ def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, data
     labels = np.asarray(train_labels, dtype='float32')
     
     return inputs, labels
+
+def getBandNumbers(channels):
+    return {
+        3:[2,3,4], # RGB
+        4: [2,3,4,8], # 10m resolution
+        7: [1,2,3,4,8,10,11], #10m + 60m resolution
+        10: [2,3,4,5,6,7,8,9,12,13], #10m + 20m resolution
+        13: [1,2,3,4,5,6,7,8,9,10,11,12,13]
+        }[channels] # full raster
