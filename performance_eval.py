@@ -14,6 +14,7 @@ import cdUtils
 import numpy as np
 from osgeo import gdal
 import tensorflow as tf
+from tensorflow import keras as K
 import pandas as pd
 import cdModels
 import matplotlib.pyplot as plt
@@ -29,6 +30,7 @@ parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
 parser.add_argument('--batch', '-b', type=int, default=32)
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
 parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
+parser.add_argument('--loss', '-l', type=str, default='bce', help='bce or bced or dice')
 args = parser.parse_args()
 
 batch_size = args.batch
@@ -45,12 +47,13 @@ model_dir = 'models/' + mod + '/'
 hist_dir = 'histories/' + mod + '/'
 plot_dir = 'plots/' + mod + '/'
 score_dir = 'scores/' + mod + '/'
+loss = args.loss
 
 if(aug==True):
-    test_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)
+    test_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)+'-'+loss
     model_name = test_name+'_'+str(channels)+'channels'
 else:
-    test_name = mod+'_'+str(img_size)+'-'+str(stride)
+    test_name = mod+'_'+str(img_size)+'-'+str(stride)+'-'+loss
     model_name = test_name+'_'+str(channels)+'channels'
 
 plot_dir = plot_dir+test_name+'/'
@@ -114,13 +117,16 @@ for f in folders:
 # Create inputs for the Neural Network
 inputs = np.asarray(train_images, dtype='float32')
 
-if(mod=='Siam' or mod=='SiamDiff'):
+if(mod=='Siam' or mod=='SiamDiff' or mod=='new_Siam'):
     inputs_1 = inputs[:,:,:,:channels]
     inputs_2 = inputs[:,:,:,channels:]
     inputs = [inputs_1, inputs_2]
 
 # Load the model
-model = tf.keras.models.load_model(model_dir + model_name + '.h5')
+if(loss=='bced' or loss=='dice'):
+    model = K.models.load_model(model_dir + model_name + '.h5', custom_objects={'weighted_bce_dice_loss': cdModels.weighted_bce_dice_loss, 'dice_coef_loss':cdModels.dice_coef_loss})
+else:
+    model = K.models.load_model(model_dir + model_name + '.h5')    
 model.summary()
 
 # Perform inference
@@ -143,8 +149,8 @@ y_pred = [item for sublist in y_pred for item in sublist]
 y_true = [item for sublist in train_labels for item in sublist]
 
 # Define metrics calculate values
-precision = tf.keras.metrics.Precision()
-recall = tf.keras.metrics.Recall()
+precision = K.metrics.Precision()
+recall = K.metrics.Recall()
 precision.update_state(y_true, y_pred)
 recall.update_state(y_true, y_pred)
 

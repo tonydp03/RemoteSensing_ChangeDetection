@@ -13,19 +13,21 @@ parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--model', type=str, default='EF', help='EF, new_EF or Siam or SiamDiff')
 parser.add_argument('--augmentation', '-a', type=bool, default=True)
 parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
+parser.add_argument('--loss', '-l', type=str, default='bce', help='bce or bced or dice')
 args = parser.parse_args()
 
 img_size = args.size
 mod = args.model
 aug = args.augmentation
 cpt = args.cpt
+loss = args.loss
 score_dir = 'scores/' + mod + '/'
 plot_dir = 'plots/' + mod + '/'
 
 if(aug==True):
-    mod_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)
+    mod_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)+'-'+loss
 else:
-    mod_name = mod+'_'+str(img_size)+'-'+str(stride)
+    mod_name = mod+'_'+str(img_size)+'-'+str(stride)+'-'+loss
 
 plot_dir = plot_dir+mod_name+'/'
 score_dir = score_dir+mod_name+'/'
@@ -99,7 +101,6 @@ plt.tight_layout()
 plt.savefig(plot_dir + model_name + '_3Dscore_comparison.pdf', format='pdf')
 
 # plot scores 2D
-#fig, ax = plt.subplots()
 ax = plt.axes()
 for i in range(len(scores)):
     ax.scatter(scores[i][2], scores[i][3], c=color[i], s=70, label=labels[i])

@@ -12,6 +12,7 @@ import os
 import numpy as np
 from tensorflow import keras as K
 import cdUtils
+import cdModels
 from osgeo import gdal
 import argparse
 
@@ -19,11 +20,12 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--stride', type=int, default=64)
-parser.add_argument('--augmentation', '-a', type=bool, default=False) # Use data augmentation or not
-parser.add_argument('-cpt', type=int, default=300) # Number of crops per tiff
-parser.add_argument('--city', type=str)
+parser.add_argument('--augmentation', '-a', type=bool, default=True) # Use data augmentation or not
+parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
+parser.add_argument('--city', type=str, default='all', help='Type "all" to perform inference on the full test dataset')
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
-# parser.add_argument('--loss', '-l', type=str, default='bce')
+parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
+parser.add_argument('--loss', '-l', type=str, default='bce', help='bce or bced')
 
 args = parser.parse_args()
 
@@ -32,60 +34,79 @@ stride = args.stride
 aug = args.augmentation
 cpt = args.cpt
 channels = args.channels
+mod = args.model
 classes = 1
 dataset_dir = '../CD_wOneraDataset/OneraDataset_Images/'
-model_dir = 'models/'
+model_dir = 'models/' + mod + '/'
 infres_dir = 'results/'
 f = args.city
-# loss = args.loss
+loss = args.loss
+
 if(aug==True):
-    model_name = 'EF_'+str(img_size)+'_aug-'+str(cpt)
+    test_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)+'-'+loss
+    model_name = test_name+'_'+str(channels)+'channels'
 else:
-    model_name = 'EF_'+str(img_size)+'-'+str(stride)
+    test_name = mod+'_'+str(img_size)+'-'+str(stride)+'-'+loss
+    model_name = test_name+'_'+str(channels)+'channels'
 
-# Build raster, pad it and crop it to get the input images
-raster1 = cdUtils.build_raster(dataset_dir + f + '/imgs_1_rect/', channels)
-raster2 = cdUtils.build_raster(dataset_dir + f + '/imgs_2_rect/', channels)
-raster = np.concatenate((raster1,raster2), axis=2)
-padded_raster = cdUtils.pad(raster, img_size)
-test_image = cdUtils.crop(padded_raster, img_size, img_size)
+os.makedirs(infres_dir, exist_ok=True)
 
-# Create inputs for the Neural Network
-inputs = np.asarray(test_image, dtype='float32')
+if(f=='all'):
+    ftest = open(dataset_dir + 'test.txt', 'r')
+    folders = ftest.read().split(',')
+    ftest.close()
+else:
+    folders=[f]
 
-# Load model
-model = K.models.load_model(model_dir + model_name + '.h5')
+# Load the model
+if(loss=='bced'):
+    model = K.models.load_model(model_dir + model_name + '.h5', custom_objects={'weighted_bce_dice_loss': cdModels.weighted_bce_dice_loss})
+else:
+    model = K.models.load_model(model_dir + model_name + '.h5')    
 model.summary()
-
 print("Model loaded!")
 
-# Perform inference
-results = model.predict(inputs)
+for f in folders:
+    print('Running inference on city: %s' %f)
+    # Build raster, pad it and crop it to get the input images
+    raster1 = cdUtils.build_raster(dataset_dir + f + '/imgs_1_rect/', channels)
+    raster2 = cdUtils.build_raster(dataset_dir + f + '/imgs_2_rect/', channels)
+    raster = np.concatenate((raster1,raster2), axis=2)
+    padded_raster = cdUtils.pad(raster, img_size)
+    test_image = cdUtils.crop(padded_raster, img_size, img_size)
 
-# Build the complete change map
-shape = (padded_raster.shape[0], padded_raster.shape[1], classes)
-padded_cm = cdUtils.uncrop(shape, results, img_size, img_size)
-cm = cdUtils.unpad(raster.shape, padded_cm)
+    # Create inputs for the Neural Network
+    inputs = np.asarray(test_image, dtype='float32')
 
-cm = np.squeeze(cm)
-cm = np.rint(cm) # we are only interested in change/unchange
-cm = cm.astype(np.uint8)
+    if(mod=='Siam' or mod=='SiamDiff' or mod=='new_Siam'):
+        inputs_1 = inputs[:,:,:,:channels]
+        inputs_2 = inputs[:,:,:,channels:]
+        inputs = [inputs_1, inputs_2]
 
-if not os.path.exists(infres_dir):
-    os.mkdir(infres_dir)
+    # Perform inference
+    results = model.predict(inputs)
 
-res_dir = infres_dir + f
+    # Build the complete change map
+    shape = (padded_raster.shape[0], padded_raster.shape[1], classes)
+    padded_cm = cdUtils.uncrop(shape, results, img_size, img_size)
+    cm = cdUtils.unpad(raster.shape, padded_cm)
 
-if not os.path.exists(res_dir):
-    os.mkdir(res_dir)
+    cm = np.squeeze(cm)
+    cm = np.rint(cm) # we are only interested in change/unchange
+    cm = cm.astype(np.uint8)
+    cm += 1
 
-# Now create the georeferenced change map
-for img in os.listdir(dataset_dir + f + '/imgs_1/'):
-    if(img.endswith('B04.tif') and img.startswith('S')):
-        geoTiff = gdal.Open(dataset_dir + f + '/imgs_1/' + img)
+    res_dir = infres_dir + f
+
+    os.makedirs(res_dir, exist_ok=True)
+
+    # Now create the georeferenced change map
+    for img in os.listdir(dataset_dir + f + '/imgs_1/'):
+        if(img.endswith('B04.tif') and img.startswith('S')):
+            geoTiff = gdal.Open(dataset_dir + f + '/imgs_1/' + img)
 
 
-# print(gdal.Info(geoTiff))
-cdUtils.createGeoCM(res_dir + '/' + model_name + '.tif', geoTiff, cm)
+    # print(gdal.Info(geoTiff))
+    cdUtils.createGeoCM(res_dir + '/' + model_name + '.tif', geoTiff, cm)
 
-print('Georeferenced change map created at %s' %res_dir)
+    print('Georeferenced change map created at %s' %res_dir)

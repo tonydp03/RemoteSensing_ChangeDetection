@@ -54,12 +54,14 @@ else:
     model_name = mod+'_'+str(img_size)+'-'+str(stride)+'-'+loss+'_'+str(channels)+'channels'
 history_name = model_name + '_history'
 
+model_dir = model_dir + model_name + '/'
+hist_dir = hist_dir + history_name + '/'
+
 # Get the list of folders to open to get rasters
 inputs = pd.read_hdf(dataset_dir+'onera_'+str(img_size)+'_cpt-'+str(cpt)+'.h5', 'images').values.reshape(-1,img_size,img_size,2*channels)
 labels = pd.read_hdf(dataset_dir+'onera_'+str(img_size)+'_cpt-'+str(cpt)+'.h5', 'labels').values.reshape(-1,img_size,img_size,1)
 inputs = inputs.astype('float32')
 labels = labels.astype('float32')
-
 
 if('Siam' in mod):
     inputs_1 = inputs[:,:,:,:channels]
@@ -71,6 +73,11 @@ else:
 # Create the model
 model = getattr(cdModels, mod+'_UNet')([img_size,img_size,channels], classes, loss)
 model.summary()
+
+'''
+HERE INSERT CODE FOR CROSS VALIDATION
+'''
+
 
 # Train the model
 if(loss=='bce'):

@@ -118,8 +118,7 @@ def random_transform(img, val):
     2: lambda img: np.rot90(img,2),
     3: lambda img: np.rot90(img,3),
     4: lambda img: np.flipud(img),
-    5: lambda img: np.fliplr(img),
-    6: lambda img: np.fliplr(np.flipud(img))
+    5: lambda img: np.fliplr(img)
     }[val](img)
 
 def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, dataset_dir, labels_dir):
@@ -139,7 +138,7 @@ def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, data
                 y = random.randint(0,raster.shape[1]-crop_size)                
                 img = trim(raster, x, y, crop_size)
                 label = trim(cm, x, y, crop_size)
-                n = random.randint(0,6)          
+                n = random.randint(0,5)          
                 train_images.append(random_transform(img, n))
                 train_labels.append(random_transform(label, n))
     else:
