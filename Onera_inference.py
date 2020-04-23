@@ -18,20 +18,17 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
+
 parser.add_argument('--size', type=int, default=128)
-parser.add_argument('--stride', type=int, default=64)
-parser.add_argument('--augmentation', '-a', type=bool, default=True) # Use data augmentation or not
-parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
-parser.add_argument('--city', type=str, default='all', help='Type "all" to perform inference on the full test dataset')
+parser.add_argument('-cpt', type=int, default=500) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
+parser.add_argument('--loss', '-l', type=str, default='bce', help='bce, bced or dice')
 parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
-parser.add_argument('--loss', '-l', type=str, default='bce', help='bce or bced')
+parser.add_argument('--city', type=str, default='all', help='Type "all" to perform inference on the full test dataset')
 
 args = parser.parse_args()
 
 img_size = args.size
-stride = args.stride
-aug = args.augmentation
 cpt = args.cpt
 channels = args.channels
 mod = args.model
@@ -42,12 +39,13 @@ infres_dir = 'results/'
 f = args.city
 loss = args.loss
 
-if(aug==True):
-    test_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)+'-'+loss
-    model_name = test_name+'_'+str(channels)+'channels'
-else:
-    test_name = mod+'_'+str(img_size)+'-'+str(stride)+'-'+loss
-    model_name = test_name+'_'+str(channels)+'channels'
+model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels'
+history_name = model_name + '_history'
+
+model_dir = model_dir + model_name + '/' #'_old/'
+hist_dir = model_dir + 'histories/'
+
+model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels-final'
 
 os.makedirs(infres_dir, exist_ok=True)
 
@@ -77,11 +75,9 @@ for f in folders:
 
     # Create inputs for the Neural Network
     inputs = np.asarray(test_image, dtype='float32')
-
-    if(mod=='Siam' or mod=='SiamDiff' or mod=='new_Siam'):
-        inputs_1 = inputs[:,:,:,:channels]
-        inputs_2 = inputs[:,:,:,channels:]
-        inputs = [inputs_1, inputs_2]
+    inputs_1 = inputs[:,:,:,:channels]
+    inputs_2 = inputs[:,:,:,channels:]
+    inputs = [inputs_1, inputs_2]
 
     # Perform inference
     results = model.predict(inputs)

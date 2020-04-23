@@ -60,13 +60,16 @@ def EF_UNet_ConvUnit(input_tensor, stage, nb_filter, kernel_size=3, mode='None',
     return x
 
 def EF_UNet(input_shape, classes=1, loss='bce'):
-    mode = 'residual'
+    mode = 'Residual'
     loss_dict = {'bce':'binary_crossentropy', 'bced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
     nb_filter = [32, 64, 128, 256, 512]
     bn_axis = 3
     
     # Left side of the U-Net
-    inputs = K.Input(shape=input_shape, name='input')
+    input_1 = K.Input(shape=input_shape, name='input_1')
+    input_2 = K.Input(shape=input_shape, name='input_2')
+    # inputs = K.layers.concatenate([input_1,input_2], axis=bn_axis)
+    inputs = K.layers.Concatenate(axis=bn_axis)([input_1,input_2])
 
     conv1 = EF_UNet_ConvUnit(inputs, stage='1', nb_filter=nb_filter[0], mode=mode, axis=bn_axis)
     pool1 = K.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
@@ -103,94 +106,9 @@ def EF_UNet(input_shape, classes=1, loss='bce'):
     # Output layer of the U-Net with a softmax activation
     output = K.layers.Conv2D(classes, (1, 1), activation='sigmoid', name='output', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(conv9)
 
-    model = K.Model(inputs=inputs, outputs=output, name='EarlyFusion-UNET')
+    model = K.Model(inputs=[input_1,input_2], outputs=output, name='EarlyFusion-UNET')
 
     model.compile(optimizer=K.optimizers.Adam(learning_rate=1e-4), loss = loss_dict[loss])    
-    
-    return model
-
-#### one less stage, conv2Dtranspose
-def new_EF_UNet(input_shape, classes=1):
-    mode = 'residual'
-    nb_filter = [32, 64, 128, 256]
-    bn_axis = 3
-    
-    # Left side of the U-Net
-    inputs = K.Input(shape=input_shape, name='input')
-
-    conv1 = EF_UNet_ConvUnit(inputs, stage='1', nb_filter=nb_filter[0], mode=mode, axis=bn_axis)
-    pool1 = K.layers.MaxPooling2D(pool_size=(2, 2))(conv1)
-    
-    conv2 = EF_UNet_ConvUnit(pool1, stage='2', nb_filter=nb_filter[1], mode=mode, axis=bn_axis)
-    pool2 = K.layers.MaxPooling2D(pool_size=(2, 2))(conv2)
-
-    conv3 = EF_UNet_ConvUnit(pool2, stage='3', nb_filter=nb_filter[2], mode=mode, axis=bn_axis)
-    pool3 = K.layers.MaxPooling2D(pool_size=(2, 2))(conv3)
-    
-    conv4 = EF_UNet_ConvUnit(pool3, stage='4', nb_filter=nb_filter[3], mode=mode, axis=bn_axis)
-    pool4 = K.layers.MaxPooling2D(pool_size=(2, 2))(conv4)
-        
-    # Right side of the U-Net
-    # Stage 5
-    stage = '5'
-    up1 = K.layers.Conv2DTranspose(nb_filter[3], (2, 2), strides=(2, 2), name='up1', padding='same')(pool4)
-    merge1 = K.layers.concatenate([conv4,up1], axis=bn_axis)
-
-    conv51 = K.layers.Conv2DTranspose(nb_filter[3], (3, 3), activation='relu', name='conv' + stage + '_1', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn51 = K.layers.BatchNormalization(name='bn' + stage + '_1', axis=bn_axis)
-    conv52 = K.layers.Conv2DTranspose(nb_filter[3], (3, 3), activation='relu', name='conv' + stage + '_2', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn52 = K.layers.BatchNormalization(name='bn' + stage + '_2', axis=bn_axis)
-    conv53 = K.layers.Conv2DTranspose(nb_filter[2], (3, 3), activation='relu', name='conv' + stage + '_3', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn53 = K.layers.BatchNormalization(name='bn' + stage + '_3', axis=bn_axis)
-    drop5 = K.layers.Dropout(0.25, name='drop'+ stage)
-
-    x5 = drop5(bn53(conv53(bn52(conv52(bn51(conv51(merge1))))))) 
-
-    # Stage 6
-    stage = '6'
-    up2 = K.layers.Conv2DTranspose(nb_filter[2], (2, 2), strides=(2, 2), name='up2', padding='same')(x5)
-    merge2 = K.layers.concatenate([conv3,up2], axis=bn_axis)
-    
-    conv61 = K.layers.Conv2DTranspose(nb_filter[2], (3, 3), activation='relu', name='conv' + stage + '_1', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn61 = K.layers.BatchNormalization(name='bn' + stage + '_1', axis=bn_axis)
-    conv62 = K.layers.Conv2DTranspose(nb_filter[2], (3, 3), activation='relu', name='conv' + stage + '_2', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn62 = K.layers.BatchNormalization(name='bn' + stage + '_2', axis=bn_axis)
-    conv63 = K.layers.Conv2DTranspose(nb_filter[1], (3, 3), activation='relu', name='conv' + stage + '_3', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn63 = K.layers.BatchNormalization(name='bn' + stage + '_3', axis=bn_axis)
-    drop6 = K.layers.Dropout(0.25, name='drop'+ stage)
-
-    x6 = drop6(bn63(conv63(bn62(conv62(bn61(conv61(merge2))))))) 
-
-    # Stage 7
-    stage = '7'
-    up3 = K.layers.Conv2DTranspose(nb_filter[1], (2, 2), strides=(2, 2), name='up3', padding='same')(x6)
-    merge3 = K.layers.concatenate([conv2,up3], axis=bn_axis)
-    
-    conv71 = K.layers.Conv2DTranspose(nb_filter[1], (3, 3), activation='relu', name='conv' + stage + '_1', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn71 = K.layers.BatchNormalization(name='bn' + stage + '_1', axis=bn_axis)
-    conv72 = K.layers.Conv2DTranspose(nb_filter[0], (3, 3), activation='relu', name='conv' + stage + '_2', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn72 = K.layers.BatchNormalization(name='bn' + stage + '_2', axis=bn_axis)
-    drop7 = K.layers.Dropout(0.25, name='drop'+ stage)
-
-    x7 = drop7(bn72(conv72(bn71(conv71(merge3))))) 
-
-    # Stage 8
-    stage = '8'
-    up4 = K.layers.Conv2DTranspose(nb_filter[0], (2, 2), strides=(2, 2), name='up4', padding='same')(x7)
-    merge4 = K.layers.concatenate([conv1,up4], axis=bn_axis)
-    
-    conv81 = K.layers.Conv2DTranspose(nb_filter[0], (3, 3), activation='relu', name='conv' + stage + '_1', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))
-    bn81 = K.layers.BatchNormalization(name='bn' + stage + '_1', axis=bn_axis)
-    drop8 = K.layers.Dropout(0.25, name='drop'+ stage)
-
-    x8 = drop8(bn81(conv81(merge4))) 
-
-    # Output layer of the U-Net with a softmax activation
-    output = K.layers.Conv2D(classes, (1, 1), activation='sigmoid', name='output', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(x8)
-
-    model = K.Model(inputs=inputs, outputs=output, name='EarlyFusion-UNET')
-
-    model.compile(optimizer=K.optimizers.Adam(learning_rate=1e-4), loss = 'binary_crossentropy')    
     
     return model
 
