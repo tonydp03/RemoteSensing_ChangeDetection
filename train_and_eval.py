@@ -20,13 +20,14 @@ import cdModels
 import argparse
 from sklearn.model_selection import KFold
 from sklearn.metrics import balanced_accuracy_score, confusion_matrix, roc_curve
+from sklearn.utils import class_weight
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--epochs', '-e', type=int, default=100)
 parser.add_argument('--batch', '-b', type=int, default=64)
-parser.add_argument('-cpt', type=int, default=500) # Number of crops per tiff
+parser.add_argument('-cpt', type=int, default=400) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
 parser.add_argument('--loss', '-l', type=str, default='bce', help='bce, bced or dice')
 parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
@@ -49,21 +50,21 @@ history_name = model_name + '_history'
 
 model_dir = model_dir + model_name + '/'
 hist_dir = model_dir + 'histories/'
+cmat_dir = model_dir + 'confusion_matrix/'
+roc_dir = model_dir + 'roc/'
 
-os.makedirs(hist_dir, exist_ok=True)
 os.makedirs(model_dir, exist_ok=True)
+os.makedirs(hist_dir, exist_ok=True)
+os.makedirs(cmat_dir, exist_ok=True)
+os.makedirs(roc_dir, exist_ok=True)
 
 # Read data
-inputs_pre = pd.read_hdf(dataset_dir+'onera_'+str(img_size)+'_cpt-'+str(cpt)+'.h5', 'images_pre').values.reshape(-1,img_size,img_size,channels)
-inputs_post = pd.read_hdf(dataset_dir+'onera_'+str(img_size)+'_cpt-'+str(cpt)+'.h5', 'images_post').values.reshape(-1,img_size,img_size,channels)
+inputs = pd.read_hdf(dataset_dir+'onera_'+str(img_size)+'_cpt-'+str(cpt)+'.h5', 'images').values.reshape(-1,img_size,img_size,2*channels)
 labels = pd.read_hdf(dataset_dir+'onera_'+str(img_size)+'_cpt-'+str(cpt)+'.h5', 'labels').values.reshape(-1,img_size,img_size,1)
 
-inputs_pre = inputs_pre.astype('float32')
-inputs_post = inputs_post.astype('float32')
-labels = labels.astype('float32')
-
-# Now shuffle data to split them better
-inputs_pre, inputs_post, labels = shuffle(inputs_pre, inputs_post, labels)
+inputs_pre = inputs[:,:,:,:channels]
+inputs_post = inputs[:,:,:,channels:]
+inputs = [inputs_pre, inputs_post]
 
 precision_list = []
 recall_list = []
@@ -81,9 +82,9 @@ for split, (train, test) in enumerate(kf.split(labels)):
         # Compute class weights
         flat_labels = np.reshape(labels[train],[-1])
         weights = class_weight.compute_class_weight('balanced', np.unique(flat_labels), flat_labels)
-        history = model.fit([inputs_pre[train], inputs_post[train]], labels[train], batch_size=batch_size, epochs=epochs, class_weight=weights, validation_split=0.1, callbacks=[K.callbacks.EarlyStopping(monitor='val_loss', patience=25, verbose=1, restore_best_weights=True)], shuffle=True, verbose=1)
+        history = model.fit([inputs_pre[train], inputs_post[train]], labels[train], batch_size=batch_size, epochs=epochs, class_weight=weights, validation_split=0.1, callbacks=[K.callbacks.EarlyStopping(monitor='val_loss', patience=15, verbose=1, restore_best_weights=True)], shuffle=True, verbose=1)
     else:
-        history = model.fit([inputs_pre[train], inputs_post[train]], labels[train], batch_size=batch_size, epochs=epochs, validation_split=0.1, callbacks=[K.callbacks.EarlyStopping(monitor='val_loss', patience=25, verbose=1, restore_best_weights=True)], shuffle=True, verbose=1)
+        history = model.fit([inputs_pre[train], inputs_post[train]], labels[train], batch_size=batch_size, epochs=epochs, validation_split=0.1, callbacks=[K.callbacks.EarlyStopping(monitor='val_loss', patience=15, verbose=1, restore_best_weights=True)], shuffle=True, verbose=1)
 
     # Save the history for accuracy/loss plotting
     history_save = pd.DataFrame(history.history).to_hdf(hist_dir + history_name + '-' + str(split) + ".h5", "history", append=False)
@@ -115,12 +116,12 @@ for split, (train, test) in enumerate(kf.split(labels)):
 
     # Compute roc_curve and save rates
     fpr, tpr, _ = roc_curve(np.reshape(labels[test], -1), np.reshape(results, -1))
-    np.savetxt(model_dir + 'fpr-'+ str(split) + '.txt', fpr)
-    np.savetxt(model_dir +'tpr-'+ str(split) + '.txt', tpr)
+    np.savetxt(roc_dir + 'fpr-'+ str(split) + '.txt', fpr)
+    np.savetxt(roc_dir +'tpr-'+ str(split) + '.txt', tpr)
  
     # Compute confusion matrix and save
     cnf_matrix = confusion_matrix(np.reshape(labels[test], -1), np.rint(np.reshape(results, -1)), normalize='true')
-    np.savetxt(model_dir + 'confusion_matrix-'+ str(split) + '.txt', cnf_matrix)
+    np.savetxt(cmat_dir + 'confusion_matrix-'+ str(split) + '.txt', cnf_matrix)
 
 
 # Save the scores of the models
@@ -142,7 +143,7 @@ f = open(model_dir + 'scores.txt',"w+")
 f.write("Precision: %f %f\n" % (model_precision[0], model_precision[1]))
 f.write("Recall: %f %f\n" % (model_recall[0], model_recall[1]))
 f.write("F1: %f %f\n" % (model_f1[0], model_f1[1]))
-f.write("BalancedAccuracy: %f %f\n" % (model_balanced_acc[0], model_balanced_acc[1]))
+f.write("BalancedAccuracy: %f %f" % (model_balanced_acc[0], model_balanced_acc[1]))
 f.close()
 
 # If performance is satisfying, deploy model for inference
