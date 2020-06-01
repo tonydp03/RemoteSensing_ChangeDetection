@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('--epochs', '-e', type=int, default=100)
 parser.add_argument('--batch', '-b', type=int, default=64)
-parser.add_argument('-cpt', type=int, default=400) # Number of crops per tiff
+parser.add_argument('-cpt', type=int, default=500) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
 parser.add_argument('--loss', '-l', type=str, default='bce', help='bce, bced or dice')
 parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')

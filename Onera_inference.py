@@ -18,7 +18,6 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('-cpt', type=int, default=400) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
@@ -39,9 +38,9 @@ infres_dir = 'results/'
 f = args.city
 loss = args.loss
 
-model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels'
+model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels_new'
 model_dir = model_dir + model_name + '/'
-model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels-final'
+model_name = model_name + '-final'
 
 os.makedirs(infres_dir, exist_ok=True)
 
@@ -89,8 +88,8 @@ try:
         cm = cm.astype(np.uint8)
         cm += 1
 
-        # res_dir = infres_dir + f + '/new'
-        res_dir = infres_dir + 'train/' + f
+        res_dir = infres_dir + f + '/new'
+        # res_dir = infres_dir + 'train/' + f
 
         os.makedirs(res_dir, exist_ok=True)
 

@@ -51,14 +51,14 @@ def EF_UNet_ConvUnit(input_tensor, stage, nb_filter, kernel_size=3, mode='None',
     x0 = x
     x = K.layers.BatchNormalization(name='bn' + stage + '_1', axis=axis)(x)
     x = K.layers.Conv2D(nb_filter, (kernel_size, kernel_size), activation='relu', name='conv' + stage + '_2', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(x)
-    x = K.layers.BatchNormalization(name='bn' + stage+ '_2', axis=axis)(x)
     if mode == 'residual':
         x = K.layers.Add(name='resi' + stage)([x, x0])
+    x = K.layers.BatchNormalization(name='bn' + stage+ '_2', axis=axis)(x)
     x = K.layers.Dropout(0.25, name='dropout'+ stage)(x)
     return x
 
 def EF_UNet(input_shape, classes=1, loss='bce'):
-    mode = 'Residual'
+    mode = 'None'
     loss_dict = {'bce':'binary_crossentropy', 'bced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
     nb_filter = [32, 64, 128, 256, 512]
     bn_axis = 3

@@ -12,35 +12,43 @@ import os
 import numpy as np
 from tensorflow import keras as K
 import cdUtils
+import cdModels
 from osgeo import gdal
 import argparse
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
-parser.add_argument('--stride', type=int, default=64)
-parser.add_argument('--augmentation', '-a', type=bool, default=True) # Use data augmentation or not
-parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
+parser.add_argument('-cpt', type=int, default=400) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13)
+parser.add_argument('--loss', '-l', type=str, default='bce', help='bce, bced or dice')
 parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
 
 args = parser.parse_args()
 
 img_size = args.size
-stride = args.stride
-aug = args.augmentation
 channels = args.channels
 cpt = args.cpt
 mod = args.model
+loss = args.loss
 classes = 1
 dataset_dir = '../CD_Sentinel2/tiff/Rome/'
 model_dir = 'models/' + mod + '/'
-infres_dir = 'results/'
+infres_dir = 'results/rome/'
 
-if(aug==True):
-    model_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)+'_'+str(channels)+'channels'
+model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels_new'
+model_dir = model_dir + model_name + '/'
+model_name = model_name + '-final'
+
+os.makedirs(infres_dir, exist_ok=True)
+
+# Load the model
+if(loss=='bced'):
+    model = K.models.load_model(model_dir + model_name + '.h5', custom_objects={'weighted_bce_dice_loss': cdModels.weighted_bce_dice_loss})
 else:
-    model_name = mod+'_'+str(img_size)+'-'+str(stride)
+    model = K.models.load_model(model_dir + model_name + '.h5')    
+model.summary()
+print("Model loaded!")
 
 tiffData_1 = gdal.Open(dataset_dir + 'pre_ro_2018_12_27.tif')
 raster1 = cdUtils.build_raster_fromMultispectral(tiffData_1, channels)
@@ -52,17 +60,9 @@ test_image = cdUtils.crop(padded_raster, img_size, img_size)
 
 # Create inputs for the Neural Network
 inputs = np.asarray(test_image, dtype='float32')
-
-if(mod=='Siam' or mod =='SiamDiff'):
-    inputs_1 = inputs[:,:,:,:channels]
-    inputs_2 = inputs[:,:,:,channels:]
-    inputs = [inputs_1, inputs_2]
-
-# Load model
-model = K.models.load_model(model_dir + model_name + '.h5')
-model.summary()
-
-print("Model loaded!")
+inputs_1 = inputs[:,:,:,:channels]
+inputs_2 = inputs[:,:,:,channels:]
+inputs = [inputs_1, inputs_2]
 
 # Perform inference
 results = model.predict(inputs)
@@ -75,9 +75,6 @@ cm = cdUtils.unpad(raster.shape, padded_cm)
 cm = np.squeeze(cm)
 cm = np.rint(cm) # we are only interested in change/unchange
 cm = cm.astype(np.uint8)
-
-if not os.path.exists(infres_dir):
-    os.mkdir(infres_dir)
 
 # Now create the georeferenced change map
 cdUtils.createGeoCM(infres_dir + 'Rome-' + model_name +'.tif', tiffData_1, cm)

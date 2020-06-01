@@ -121,6 +121,45 @@ def random_transform(img, val):
     5: lambda img: np.fliplr(img)
     }[val](img)
 
+# def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, dataset_dir, labels_dir):
+#     train_images = []
+#     train_labels = []
+    
+#     if(aug==True): # select random crops and apply transformation
+#         for f in folders:
+#             raster1 = build_raster(dataset_dir + f + '/imgs_1_rect/', channels)
+#             raster2 = build_raster(dataset_dir + f + '/imgs_2_rect/', channels)
+#             raster = np.concatenate((raster1,raster2), axis=2)
+#             cm = gdal.Open(labels_dir + f + '/cm/' + f + '-cm.tif').ReadAsArray()
+#             cm = np.expand_dims(cm, axis=2)
+#             cm -= 1 # the change map has values 1 for no change and 2 for change ---> scale back to 0 and 1
+#             for i in range(cpt):
+#                 x = random.randint(0,raster.shape[0]-crop_size)
+#                 y = random.randint(0,raster.shape[1]-crop_size)                
+#                 img = trim(raster, x, y, crop_size)
+#                 label = trim(cm, x, y, crop_size)
+#                 n = random.randint(0,5)          
+#                 train_images.append(random_transform(img, n))
+#                 train_labels.append(random_transform(label, n))
+#     else:
+#         for f in folders:
+#             raster1 = build_raster(dataset_dir + f + '/imgs_1_rect/')
+#             raster2 = build_raster(dataset_dir + f + '/imgs_2_rect/')
+#             raster = np.concatenate((raster1,raster2), axis=2)
+#             cm = gdal.Open(labels_dir + f + '/cm/' + f + '-cm.tif').ReadAsArray()
+#             cm = np.expand_dims(cm, axis=2)
+#             cm -= 1 # the change map has values 1 for no change and 2 for change ---> scale back to 0 and 1
+#             padded_raster = pad(raster, crop_size)
+#             train_images = train_images + crop(padded_raster, crop_size, stride)    
+#             padded_cm = pad(cm, crop_size)
+#             train_labels = train_labels + crop(padded_cm, crop_size, stride)
+
+#     # Create inputs and labels for the Neural Network
+#     inputs = np.asarray(train_images, dtype='float32')
+#     labels = np.asarray(train_labels, dtype='float32')
+    
+#     return inputs, labels
+
 def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, dataset_dir, labels_dir):
     train_images = []
     train_labels = []
@@ -133,14 +172,22 @@ def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, data
             cm = gdal.Open(labels_dir + f + '/cm/' + f + '-cm.tif').ReadAsArray()
             cm = np.expand_dims(cm, axis=2)
             cm -= 1 # the change map has values 1 for no change and 2 for change ---> scale back to 0 and 1
+            print('*** City %s started ***' %f)
             for i in range(cpt):
                 x = random.randint(0,raster.shape[0]-crop_size)
                 y = random.randint(0,raster.shape[1]-crop_size)                
-                img = trim(raster, x, y, crop_size)
                 label = trim(cm, x, y, crop_size)
-                n = random.randint(0,5)          
-                train_images.append(random_transform(img, n))
-                train_labels.append(random_transform(label, n))
+                _, counts = np.unique(label, return_counts=True)
+                img = trim(raster, x, y, crop_size)
+                if(float(len(counts)==1 or counts[1]/(np.sum(counts)))<0.1):
+                    n = random.randint(0,5)
+                    train_images.append(random_transform(img, n))
+                    train_labels.append(random_transform(label, n))
+                else: # if change pixels cover less than 1% of the image, discard the patch
+                    for n in range(6):
+                        train_images.append(random_transform(img, n))
+                        train_labels.append(random_transform(label, n))
+            print('*** City %s finished ***' %f)
     else:
         for f in folders:
             raster1 = build_raster(dataset_dir + f + '/imgs_1_rect/')
@@ -158,6 +205,10 @@ def createDataset_fromOnera(aug, cpt, crop_size, stride, channels, folders, data
     inputs = np.asarray(train_images, dtype='float32')
     labels = np.asarray(train_labels, dtype='float32')
     
+    # Remove doubles
+    inputs, indices = np.unique(inputs, axis=0, return_index=True)
+    labels = labels[indices]
+
     return inputs, labels
 
 def getBandNumbers(channels):

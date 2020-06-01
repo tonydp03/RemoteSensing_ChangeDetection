@@ -24,8 +24,6 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
-parser.add_argument('--stride', type=int, default=64)
-parser.add_argument('--augmentation', '-a', type=bool, default=True) # Use data augmentation or not
 parser.add_argument('-cpt', type=int, default=600) # Number of crops per tiff
 parser.add_argument('--batch', '-b', type=int, default=32)
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
@@ -36,7 +34,6 @@ args = parser.parse_args()
 batch_size = args.batch
 img_size = args.size
 channels = args.channels
-stride = args.stride
 aug = args.augmentation
 cpt = args.cpt
 mod = args.model
@@ -49,12 +46,9 @@ plot_dir = 'plots/' + mod + '/'
 score_dir = 'scores/' + mod + '/'
 loss = args.loss
 
-if(aug==True):
-    test_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)+'-'+loss
-    model_name = test_name+'_'+str(channels)+'channels'
-else:
-    test_name = mod+'_'+str(img_size)+'-'+str(stride)+'-'+loss
-    model_name = test_name+'_'+str(channels)+'channels'
+test_name = mod+'_'+str(img_size)+'_aug-'+str(cpt)+'-'+loss
+model_name = test_name+'_'+str(channels)+'channels'
+
 
 plot_dir = plot_dir+test_name+'/'
 score_dir = score_dir+test_name+'/'
@@ -202,8 +196,8 @@ plt.show()
 
 
 # ROC curve
-fpr = []
-tpr = []
+fpr = [] ###### NOT NECESSARY! BELOW ROC_CURVE READS AS ARRAYS 
+tpr = [] ###### TO BE LOADED WITH np.loadtxt
 
 fpr, tpr, _ = roc_curve(y_true, y_pred)
 roc_auc = auc(fpr, tpr)
