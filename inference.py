@@ -36,7 +36,7 @@ dataset_dir = '../CD_Sentinel2/tiff/Rome/'
 model_dir = 'models/' + mod + '/'
 infres_dir = 'results/rome/'
 
-model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels_new'
+model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels'
 model_dir = model_dir + model_name + '/'
 model_name = model_name + '-final'
 

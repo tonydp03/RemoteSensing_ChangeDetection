@@ -38,7 +38,7 @@ infres_dir = 'results/'
 f = args.city
 loss = args.loss
 
-model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels_new'
+model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels'
 model_dir = model_dir + model_name + '/'
 model_name = model_name + '-final'
 
