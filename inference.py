@@ -19,10 +19,12 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
-parser.add_argument('-cpt', type=int, default=400) # Number of crops per tiff
+parser.add_argument('-cpt', type=int, default=500) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13)
 parser.add_argument('--loss', '-l', type=str, default='bce', help='bce, bced or dice')
 parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
+parser.add_argument('--city', type=str, default='rome', help='rome or sot')
+parser.add_argument('--year', '-y', type=int, default='2016', help='from 2015 to 2019, take the pair thisyear-nextyear')
 
 args = parser.parse_args()
 
@@ -31,16 +33,14 @@ channels = args.channels
 cpt = args.cpt
 mod = args.model
 loss = args.loss
+city = args.city
+year = str(args.year)+'-'+str(args.year + 1)
 classes = 1
-dataset_dir = '../CD_Sentinel2/tiff/Rome/'
 model_dir = 'models/' + mod + '/'
-infres_dir = 'results/rome/'
 
 model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels'
 model_dir = model_dir + model_name + '/'
 model_name = model_name + '-final'
-
-os.makedirs(infres_dir, exist_ok=True)
 
 # Load the model
 if(loss=='bced'):
@@ -50,14 +50,41 @@ else:
 model.summary()
 print("Model loaded!")
 
-tiffData_1 = gdal.Open(dataset_dir + 'pre_ro_2018_12_27.tif')
+if(city=='rome'):
+    dataset_dir = '../CD_Sentinel2/tiff/Rome/'
+    infres_dir = 'results/rome/'
+    cm_name = model_name
+else: 
+    dataset_dir = 'Stoke_On_Trent/' + year + '/'
+    infres_dir = 'results/SoT/'
+    cm_name = model_name + '_' + year
+
+os.makedirs(infres_dir, exist_ok=True)
+
+for image in os.listdir(dataset_dir):
+    if((image.startswith('2') or image.startswith('p')) and ('pre' in image)):
+        img_pre = image
+    elif((image.startswith('2') or image.startswith('p')) and ('post' in image)):
+        img_post = image
+
+print(img_pre)
+print(img_post)
+
+tiffData_1 = gdal.Open(dataset_dir + img_pre)
 raster1 = cdUtils.build_raster_fromMultispectral(tiffData_1, channels)
-tiffData_2 = gdal.Open('../CD_Sentinel2/tiff/Rome/post_ro_2019_09_13.tif')
+tiffData_2 = gdal.Open(dataset_dir + img_post)
 raster2 = cdUtils.build_raster_fromMultispectral(tiffData_2, channels)
+for i in range(raster1.shape[0]):
+    for j in range(raster1.shape[1]):
+        for k in range(raster1.shape[2]):
+            if(raster1[i,j,k] != raster2[i,j,k]):
+                print('Found change!')
+print('END')
 raster = np.concatenate((raster1,raster2), axis=2)
 padded_raster = cdUtils.pad(raster, img_size)
 test_image = cdUtils.crop(padded_raster, img_size, img_size)
 
+'''
 # Create inputs for the Neural Network
 inputs = np.asarray(test_image, dtype='float32')
 inputs_1 = inputs[:,:,:,:channels]
@@ -77,6 +104,7 @@ cm = np.rint(cm) # we are only interested in change/unchange
 cm = cm.astype(np.uint8)
 
 # Now create the georeferenced change map
-cdUtils.createGeoCM(infres_dir + 'Rome-' + model_name +'.tif', tiffData_1, cm)
+cdUtils.createGeoCM(infres_dir + cm_name + '.tif', tiffData_1, cm)
 
 print('Georeferenced change map created at %s' %infres_dir)
+'''
