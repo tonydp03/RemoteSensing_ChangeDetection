@@ -23,8 +23,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('-cpt', type=int, default=500) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
-parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
-parser.add_argument('--loss', '-l', type=str, default='bce', help='bce or bced or dice')
+parser.add_argument('--model', type=str, default='EF', help='EF, Siam or EFv2')
+parser.add_argument('--loss', '-l', type=str, default='bce', help='bce, wbced or dice')
 args = parser.parse_args()
 
 img_size = args.size
@@ -32,7 +32,7 @@ channels = args.channels
 cpt = args.cpt
 mod = args.model
 classes = 1
-model_dir = 'models/' + mod + '/'
+model_dir = '../models/' + mod + '/'
 loss = args.loss
 
 model_name = mod+'_'+str(img_size)+'_cpt-'+str(cpt)+'-'+loss+'_'+str(channels)+'channels'

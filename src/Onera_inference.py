@@ -19,9 +19,9 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
-parser.add_argument('-cpt', type=int, default=400) # Number of crops per tiff
+parser.add_argument('-cpt', type=int, default=500) # Number of crops per tiff
 parser.add_argument('--channels', '-ch', type=int, default=13) # Number of channels
-parser.add_argument('--loss', '-l', type=str, default='bce', help='bce, bced or dice')
+parser.add_argument('--loss', '-l', type=str, default='bce', help='wbced, bced or dice')
 parser.add_argument('--model', type=str, default='EF', help='EF, Siam or SiamDiff')
 parser.add_argument('--city', type=str, default='all', help='Type "all" to perform inference on the full test dataset')
 
@@ -32,9 +32,9 @@ cpt = args.cpt
 channels = args.channels
 mod = args.model
 classes = 1
-dataset_dir = '../CD_wOneraDataset/OneraDataset_Images/'
-model_dir = 'models/' + mod + '/'
-infres_dir = 'results/'
+dataset_dir = '../../CD_wOneraDataset/OneraDataset_Images/'
+model_dir = '../models/' + mod + '/'
+infres_dir = '../results/'
 f = args.city
 loss = args.loss
 
@@ -53,7 +53,7 @@ else:
 
 try:
     # Load the model
-    if(loss=='bced'):
+    if(loss=='wbced'):
         model = K.models.load_model(model_dir + model_name + '.h5', custom_objects={'weighted_bce_dice_loss': cdModels.weighted_bce_dice_loss})
     else:
         model = K.models.load_model(model_dir + model_name + '.h5')    

@@ -23,19 +23,22 @@ from sklearn.utils import shuffle
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', type=int, default=128)
 parser.add_argument('-cpt', type=int, default=500) # Number of crops per tiff
+parser.add_argument('--stride', type=int, default=15)
+parser.add_argument('--mode', type=int, default=1, help='0 for classification/regression, 1 for segmentation')
 args = parser.parse_args()
 
 img_size = args.size
 cpt = args.cpt
+mode = args.mode
+stride = args.stride
 channels = 13
 
-dataset_dir = '../CD_wOneraDataset/OneraDataset_Images/'
-labels_dir = '../CD_wOneraDataset/OneraDataset_TrainLabels/'
-save_dir = 'datasets/'
-dataset_name = 'onera_'+str(img_size)+'_cpt-'+str(cpt)
+dataset_dir = '../../CD_wOneraDataset/OneraDataset_Images/'
+labels_dir = '../../CD_wOneraDataset/OneraDataset_TrainLabels/'
+save_dir = '../datasets/'
 
 
-def make_dataset(cpt, crop_size):
+def make_dataset_segmentation(cpt, crop_size):
     train_images = []
     train_labels = []
     
@@ -88,14 +91,61 @@ def make_dataset(cpt, crop_size):
 
     return df_images, df_labels
 
-start_time = time.time()
-df_images, df_labels  = make_dataset(cpt, img_size)
-print("CREATING TIME --- %s seconds ---" % (time.time() - start_time))
-print('DATASET CREATED')
+def make_dataset_classreg(crop_size, stride):
+    train_images = []
+    train_labels = []
+    
+    # Get the list of folders to open to get rasters
+    f = open(dataset_dir + 'train.txt', 'r')
+    folders = f.read().split(',')
+    f.close()
+
+    for f in folders:
+        print('*** City %s started ***' %f)
+        raster1 = cdUtils.build_raster(dataset_dir + f + '/imgs_1_rect/', channels)
+        raster2 = cdUtils.build_raster(dataset_dir + f + '/imgs_2_rect/', channels)
+        raster = np.concatenate((raster1,raster2), axis=2)
+        padded_raster = cdUtils.pad(raster, crop_size)
+        train_images = train_images + cdUtils.crop(padded_raster, crop_size, stride)
+
+        cm = gdal.Open(labels_dir + f + '/cm/' + f + '-cm.tif').ReadAsArray()
+        cm = np.expand_dims(cm, axis=2)
+        cm -= 1 # the change map has values 1 for no change and 2 for change ---> scale back to 0 and 1
+        padded_cm = cdUtils.pad(cm, crop_size)
+        train_labels = train_labels + cdUtils.crop(padded_cm, crop_size, stride)
+        print('*** City %s finished ***' %f)
+
+    # Create inputs and labels as arrays
+    inputs = np.asarray(train_images, dtype='float32')
+    labels = np.asarray(train_labels, dtype='float32')
+   
+    # Now shuffle data
+    inputs, labels = shuffle(inputs, labels)
+
+    # Flatten arrays and save them as dataframes 
+    flat_inputs = inputs.reshape(inputs.shape[0], -1)
+    flat_labels = labels.reshape(labels.shape[0], -1)
+
+    df_images = pd.DataFrame(data=flat_inputs)
+    df_labels = pd.DataFrame(data=flat_labels)
+
+    return df_images, df_labels
+
 os.makedirs(save_dir, exist_ok=True)
 
-start_time = time.time()
+if(mode==0):    
+    dataset_name = 'onera_'+str(img_size)+'_str-'+str(stride)+'_classreg'
+
+    print('CREATING DATASET')
+    df_images, df_labels  = make_dataset_classreg(img_size, stride)
+    print('DATASET COMPLETED')
+else:
+    dataset_name = 'onera_'+str(img_size)+'_cpt-'+str(cpt)
+
+    print('CREATING DATASET')
+    df_images, df_labels  = make_dataset_segmentation(cpt, img_size)
+    print('DATASET COMPLETED')
+
 df_images.to_hdf(save_dir+dataset_name+".h5","images",append=False)
 df_labels.to_hdf(save_dir+dataset_name+".h5","labels",append=False)
-print("SAVING TIME --- %s seconds ---" % (time.time() - start_time))
 print('DATASET SAVED')

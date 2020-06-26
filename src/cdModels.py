@@ -24,24 +24,24 @@ def dice_coef(y_true, y_pred, smooth=1):
 def dice_coef_loss(y_true, y_pred):
     return 1 - dice_coef(y_true, y_pred)
 
-def weighted_bce_dice_loss(y_true,y_pred):
-    class_loglosses = K.backend.mean(K.backend.binary_crossentropy(y_true, y_pred), axis=[0, 1, 2]) # mean bce over all the pixels of an image
-    # weights = [0.5, 23]
-    weights = [0.1, 0.9]
-    weighted_bce = K.backend.sum(class_loglosses * K.backend.constant(weights))
-    return weighted_bce + dice_coef_loss(y_true, y_pred)
+# def weighted_bce_dice_loss(y_true,y_pred):
+#     class_loglosses = K.backend.mean(K.backend.binary_crossentropy(y_true, y_pred), axis=[0, 1, 2]) # mean bce over all the pixels of an image
+#     # weights = [0.5, 23]
+#     weights = [0.1, 0.9]
+#     weighted_bce = K.backend.sum(class_loglosses * K.backend.constant(weights))
+#     return weighted_bce + dice_coef_loss(y_true, y_pred)
 
 # NEW VERSION ---- Should be more correct
-# def weighted_bce_dice_loss(y_true,y_pred):
-#     bce = K.backend.binary_crossentropy(y_true, y_pred)
-#     # Apply the weights
-#     # weights = [0.5, 23]
-#     # weights = [0.1, 0.9]
-#     weights = [0.02, 0.98]
-#     weight_vector = y_true * weights[0] + (1. - y_true) * weights[1] # the higher weight multiplies the term of the crossentropy corresponding to the class with less samples
-#     wbce = weight_vector * bce
-#     weighted_bce = K.backend.mean(wbce)
-#     return weighted_bce + dice_coef_loss(y_true, y_pred)
+def weighted_bce_dice_loss(y_true,y_pred):
+    bce = K.backend.binary_crossentropy(y_true, y_pred)
+    # Apply the weights
+    # weights = [0.5, 23]
+    # weights = [0.1, 0.9]
+    weights = [0.02, 0.98]
+    weight_vector = y_true * weights[0] + (1. - y_true) * weights[1] # the higher weight multiplies the term of the crossentropy corresponding to the class with less samples
+    wbce = weight_vector * bce
+    weighted_bce = K.backend.mean(wbce)
+    return weighted_bce + dice_coef_loss(y_true, y_pred)
 
 
 ##### EARLY FUSION MODEL #####
@@ -59,7 +59,7 @@ def EF_UNet_ConvUnit(input_tensor, stage, nb_filter, kernel_size=3, mode='None',
 
 def EF_UNet(input_shape, classes=1, loss='bce'):
     mode = 'None'
-    loss_dict = {'bce':'binary_crossentropy', 'bced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
+    loss_dict = {'bce':'binary_crossentropy', 'wbced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
     nb_filter = [32, 64, 128, 256, 512]
     bn_axis = 3
     
@@ -114,7 +114,7 @@ def EF_UNet(input_shape, classes=1, loss='bce'):
 
 def Siam_UNet(input_shape,classes=1, loss='bce'):
     nb_filter = [32, 64, 128, 256, 512]
-    loss_dict = {'bce':'binary_crossentropy', 'bced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
+    loss_dict = {'bce':'binary_crossentropy', 'wbced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
 
     input1 = K.Input(shape=input_shape, name='input_1')
     input2 = K.Input(shape=input_shape, name='input_2')
@@ -380,8 +380,8 @@ def SiamDiff_UNet(input_shape, classes=1, loss='bce'):
 # EF v2 --- two outputs
 
 def EFv2_UNet(input_shape, classes=1, loss='bce'):
-    mode = 'Residual'
-    loss_dict = {'bce':'binary_crossentropy', 'bced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
+    mode = 'None'
+    loss_dict = {'bce':'binary_crossentropy', 'wbced': weighted_bce_dice_loss, 'dice':dice_coef_loss}
     nb_filter = [32, 64, 128, 256, 512]
     bn_axis = 3
     
@@ -436,6 +436,51 @@ def EFv2_UNet(input_shape, classes=1, loss='bce'):
 
     model = K.Model(inputs=[input_1,input_2], outputs=[output_1, output_2], name='EarlyFusion-UNET')
 
-    model.compile(optimizer=K.optimizers.Adam(learning_rate=1e-4), loss = loss_dict[loss])    
+    model.compile(optimizer=K.optimizers.Adam(learning_rate=1e-4), loss = {'output_1':loss_dict[loss], 'output_2':'mse'}, loss_weights={'output_1': 1, 'output_2': 0.1})    
     
     return model
+
+
+def EF_CNN(input_shape, loss='mse'):
+    nb_filter = [16, 32, 64]
+    kernel_size = 3
+    loss_dict = {'mse':'mse', 'bce':'binary_crossentropy'}
+
+    # Left side of the U-Net
+    input_1 = K.Input(shape=input_shape, name='input_1')
+    input_2 = K.Input(shape=input_shape, name='input_2')
+    inputs = K.layers.Concatenate(axis=3)([input_1,input_2])
+
+    conv1 = K.layers.Conv2D(nb_filter[0], (kernel_size, kernel_size), activation='relu', name='conv1_1', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(inputs)
+    bn1 = K.layers.BatchNormalization(name='bn1_1', axis=3)(conv1)
+    conv1 = K.layers.Conv2D(nb_filter[0], (kernel_size, kernel_size), activation='relu', name='conv1_2', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(bn1)
+    bn1 = K.layers.BatchNormalization(name='bn1_2', axis=3)(conv1)
+    drop1 = K.layers.Dropout(0.25, name='drop_1')(bn1)
+    pool1 = K.layers.MaxPooling2D(pool_size=(2, 2))(drop1)
+
+    conv2 = K.layers.Conv2D(nb_filter[1], (kernel_size, kernel_size), activation='relu', name='conv2_1', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(pool1)
+    bn2 = K.layers.BatchNormalization(name='bn2_1', axis=3)(conv2)
+    conv2 = K.layers.Conv2D(nb_filter[1], (kernel_size, kernel_size), activation='relu', name='conv2_2', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(bn2)
+    bn2 = K.layers.BatchNormalization(name='bn2_2', axis=3)(conv2)
+    drop2 = K.layers.Dropout(0.25, name='drop_2')(bn2)
+    pool2 = K.layers.MaxPooling2D(pool_size=(2, 2))(drop2)
+    
+    conv3 = K.layers.Conv2D(nb_filter[2], (kernel_size-1, kernel_size-1), activation='relu', name='conv3_1', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(pool2)
+    bn3 = K.layers.BatchNormalization(name='bn3_1', axis=3)(conv3)
+    conv3 = K.layers.Conv2D(nb_filter[2], (kernel_size-1, kernel_size-1), activation='relu', name='conv3_2', padding='same', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(bn3)
+    bn3 = K.layers.BatchNormalization(name='bn3_2', axis=3)(conv3)
+    drop3 = K.layers.Dropout(0.25, name='drop_3')(bn3)
+    # pool3 = K.layers.MaxPooling2D(pool_size=(2, 2), padding='same')(drop3)
+    
+    flat = K.layers.Flatten()(drop3)
+    # bnflat = K.layers.BatchNormalization(name='bnflat')(flat)
+    dense1 = K.layers.Dense(64, activation='relu', name='dense1', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(flat)
+    dense2 = K.layers.Dense(8, activation='relu', name='dense2', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(dense1)
+    output = K.layers.Dense(1, activation='sigmoid', name='dense3', kernel_initializer='he_normal', kernel_regularizer=K.regularizers.l2(1e-4))(dense2)
+
+    model = K.Model(inputs=[input_1,input_2], outputs=output, name='EarlyFusion-CNN')
+
+    model.compile(optimizer=K.optimizers.Adam(), loss = loss_dict[loss])
+    
+    return model
+
